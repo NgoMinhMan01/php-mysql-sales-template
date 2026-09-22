@@ -1,7 +1,49 @@
 <?php
 
 $pageTitle = 'Quản lý danh mục';
+require_once '/var/www/src/config/database.php';
 
+$error = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $categoryName = trim($_POST['category_name'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+
+    if ($categoryName === '') {
+
+        $error = 'Tên danh mục không được để trống.';
+
+    } else {
+
+        $sql = "
+    INSERT INTO categories
+        (CategoryName, Description)
+    VALUES
+        (?, ?)
+";
+
+$stmt = $conn->prepare($sql);
+
+$stmt->bind_param(
+    'ss',
+    $categoryName,
+    $description
+);
+
+if ($stmt->execute()) {
+
+    header('Location: /categories/');
+    exit;
+
+} else {
+
+    $error = 'Không thể thêm danh mục.';
+}
+
+$stmt->close();
+
+    }
+}
 require_once '/var/www/src/config/database.php';
 
 $sql = "
@@ -26,7 +68,7 @@ require_once '/var/www/src/includes/navbar.php';
 
         <h2>Quản lý danh mục</h2>
 
-        <a href="#" class="btn btn-primary">
+        <a href="/categories/create.php" class="btn btn-primary">
             Thêm danh mục
         </a>
 
