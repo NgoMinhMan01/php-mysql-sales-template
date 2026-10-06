@@ -26,78 +26,218 @@ if (!$product) {
 
 // 3. Lấy danh sách Categories và Suppliers cho Dropdown
 $categories = $conn->query("SELECT CategoryID, CategoryName FROM categories ORDER BY CategoryName");
-$suppliers = $conn->query("SELECT SupplierID, SupplierName FROM suppliers ORDER BY SupplierName");
+$suppliers  = $conn->query("SELECT SupplierID, SupplierName FROM suppliers ORDER BY SupplierName");
 
 $errors = [];
 
+// Hàm hỗ trợ cập nhật lại SortOrder và đảm bảo IsPrimary = 1 cho ảnh đầu tiên
+function reorderImages($conn, $productID) {
+    $stmt = $conn->prepare("SELECT ProductImageID FROM product_images WHERE ProductID = ? ORDER BY SortOrder ASC, ProductImageID ASC");
+    $stmt->bind_param('i', $productID);
+    $stmt->execute();
+    $res = $stmt->get_result();
+
+    $images = [];
+    while ($row = $res->fetch_assoc()) {
+        $images[] = $row['ProductImageID'];
+    }
+
+    if (empty($images)) {
+        return;
+    }
+
+    // Đặt IsPrimary = 0 cho tất cả
+    $stmtReset = $conn->prepare("UPDATE product_images SET IsPrimary = 0 WHERE ProductID = ?");
+    $stmtReset->bind_param('i', $productID);
+    $stmtReset->execute();
+
+    // Cập nhật SortOrder liên tục 1, 2, 3...
+    $stmtUpdate = $conn->prepare("UPDATE product_images SET SortOrder = ? WHERE ProductImageID = ?");
+    foreach ($images as $index => $imageId) {
+        $sortOrder = $index + 1;
+        $stmtUpdate->bind_param('ii', $sortOrder, $imageId);
+        $stmtUpdate->execute();
+    }
+
+    // Kiểm tra xem đã có ảnh nào làm IsPrimary chưa
+    $stmtCheckPrimary = $conn->prepare("SELECT COUNT(*) AS cnt FROM product_images WHERE ProductID = ? AND IsPrimary = 1");
+    $stmtCheckPrimary->bind_param('i', $productID);
+    $stmtCheckPrimary->execute();
+    $primaryCount = $stmtCheckPrimary->get_result()->fetch_assoc()['cnt'];
+
+    // Nếu chưa có ảnh nào là IsPrimary, đặt ảnh đầu tiên (SortOrder = 1) làm ảnh chính
+    if ($primaryCount == 0) {
+        $stmtSetPrimary = $conn->prepare("UPDATE product_images SET IsPrimary = 1 WHERE ProductID = ? AND SortOrder = 1");
+        $stmtSetPrimary->bind_param('i', $productID);
+        $stmtSetPrimary->execute();
+    }
+}
+
 // 4. Xử lý khi Form gửi dữ liệu (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $productCode   = trim($_POST['product_code'] ?? '');
-    $productName   = trim($_POST['product_name'] ?? '');
-    $description   = trim($_POST['description'] ?? '');
-    $unit          = trim($_POST['unit'] ?? '');
-    $price         = (float) ($_POST['price'] ?? 0);
-    $stockQuantity = (int) ($_POST['stock_quantity'] ?? 0);
-    $isActive      = isset($_POST['is_active']) ? 1 : 0;
-    $categoryID    = (int) ($_POST['category_id'] ?? 0);
-    $supplierID    = (int) ($_POST['supplier_id'] ?? 0);
 
-    // Kiểm tra dữ liệu đầu vào (Validation)
-    if (empty($productCode)) {
-        $errors[] = 'Vui lòng nhập mã sản phẩm.';
-    }
-    if (empty($productName)) {
-        $errors[] = 'Vui lòng nhập tên sản phẩm.';
-    }
-    if ($categoryID <= 0) {
-        $errors[] = 'Vui lòng chọn danh mục.';
-    }
-    if ($supplierID <= 0) {
-        $errors[] = 'Vui lòng chọn nhà cung cấp.';
-    }
+    // --- A. THAO TÁC ĐẶT ẢNH CHÍNH ---
+    if (isset($_POST['action']) && $_POST['action'] === 'set_primary') {
+        $imageId = (int)($_POST['image_id'] ?? 0);
+        if ($imageId > 0) {
+            // Đặt tất cả ảnh của sản phẩm này về IsPrimary = 0
+            $stmtReset = $conn->prepare("UPDATE product_images SET IsPrimary = 0 WHERE ProductID = ?");
+            $stmtReset->bind_param('i', $productID);
+            $stmtReset->execute();
 
-    // Nếu không có lỗi, tiến hành UPDATE dữ liệu
-    if (empty($errors)) {
-        $sql = "
-            UPDATE products
-            SET
-                ProductCode = ?,
-                ProductName = ?,
-                Description = ?,
-                Unit = ?,
-                Price = ?,
-                StockQuantity = ?,
-                IsActive = ?,
-                SupplierID = ?,
-                CategoryID = ?
-            WHERE ProductID = ?
-        ";
+            // Đặt ảnh chọn thành IsPrimary = 1
+            $stmtSet = $conn->prepare("UPDATE product_images SET IsPrimary = 1 WHERE ProductImageID = ? AND ProductID = ?");
+            $stmtSet->bind_param('ii', $imageId, $productID);
+            $stmtSet->execute();
 
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param(
-            'ssssdiiiii',
-            $productCode,
-            $productName,
-            $description,
-            $unit,
-            $price,
-            $stockQuantity,
-            $isActive,
-            $supplierID,
-            $categoryID,
-            $productID
-        );
-
-        if ($stmt->execute()) {
-            header('Location: /products/');
+            header("Location: /products/edit.php?id=" . $productID);
             exit;
-        } else {
-            $errors[] = 'Lỗi hệ thống: ' . $stmt->error;
+        }
+    }
+
+    // --- B. THAO TÁC XÓA ẢNH ---
+    if (isset($_POST['action']) && $_POST['action'] === 'delete_image') {
+        $imageId = (int)($_POST['image_id'] ?? 0);
+        if ($imageId > 0) {
+            // Lấy tên file ảnh để xóa file vật lý
+            $stmtFile = $conn->prepare("SELECT ImageFile FROM product_images WHERE ProductImageID = ? AND ProductID = ?");
+            $stmtFile->bind_param('ii', $imageId, $productID);
+            $stmtFile->execute();
+            $imgRow = $stmtFile->get_result()->fetch_assoc();
+
+            if ($imgRow) {
+                // Xóa khỏi CSDL
+                $stmtDel = $conn->prepare("DELETE FROM product_images WHERE ProductImageID = ?");
+                $stmtDel->bind_param('i', $imageId);
+                $stmtDel->execute();
+
+                // Xóa file vật lý nếu không phải ảnh seed mẫu
+                $filePath = '/var/www/html/uploads/products/' . $imgRow['ImageFile'];
+                if (file_exists($filePath) && strpos($imgRow['ImageFile'], 'product-') === 0) {
+                    unlink($filePath);
+                }
+
+                // Sắp xếp lại SortOrder & IsPrimary
+                reorderImages($conn, $productID);
+            }
+
+            header("Location: /products/edit.php?id=" . $productID);
+            exit;
+        }
+    }
+
+    // --- C. THAO TÁC CẬP NHẬT THÔNG TIN SẢN PHẨM & UPLOAD ẢNH MỚI ---
+    if (!isset($_POST['action'])) {
+        $productCode   = trim($_POST['product_code'] ?? '');
+        $productName   = trim($_POST['product_name'] ?? '');
+        $description   = trim($_POST['description'] ?? '');
+        $unit          = trim($_POST['unit'] ?? '');
+        $price         = (float) ($_POST['price'] ?? 0);
+        $stockQuantity = (int) ($_POST['stock_quantity'] ?? 0);
+        $isActive      = isset($_POST['is_active']) ? 1 : 0;
+        $categoryID    = (int) ($_POST['category_id'] ?? 0);
+        $supplierID    = (int) ($_POST['supplier_id'] ?? 0);
+
+        // Validation
+        if (empty($productCode)) {
+            $errors[] = 'Vui lòng nhập mã sản phẩm.';
+        }
+        if (empty($productName)) {
+            $errors[] = 'Vui lòng nhập tên sản phẩm.';
+        }
+        if ($categoryID <= 0) {
+            $errors[] = 'Vui lòng chọn danh mục.';
+        }
+        if ($supplierID <= 0) {
+            $errors[] = 'Vui lòng chọn nhà cung cấp.';
+        }
+
+        // Nếu không có lỗi, tiến hành UPDATE dữ liệu
+        if (empty($errors)) {
+            $sql = "
+                UPDATE products
+                SET
+                    ProductCode = ?,
+                    ProductName = ?,
+                    Description = ?,
+                    Unit = ?,
+                    Price = ?,
+                    StockQuantity = ?,
+                    IsActive = ?,
+                    SupplierID = ?,
+                    CategoryID = ?
+                WHERE ProductID = ?
+            ";
+
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param(
+                'ssssdiiiii',
+                $productCode,
+                $productName,
+                $description,
+                $unit,
+                $price,
+                $stockQuantity,
+                $isActive,
+                $supplierID,
+                $categoryID,
+                $productID
+            );
+
+            if ($stmt->execute()) {
+                // Xử lý upload ảnh mới (nếu có)
+                if (isset($_FILES['product_images']) && !empty($_FILES['product_images']['name'][0])) {
+                    $uploadDir = '/var/www/html/uploads/products/';
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+
+                    // Lấy SortOrder lớn nhất hiện tại
+                    $stmtMax = $conn->prepare("SELECT MAX(SortOrder) AS max_order FROM product_images WHERE ProductID = ?");
+                    $stmtMax->bind_param('i', $productID);
+                    $stmtMax->execute();
+                    $maxOrder = (int)($stmtMax->get_result()->fetch_assoc()['max_order'] ?? 0);
+
+                    $allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+
+                    foreach ($_FILES['product_images']['tmp_name'] as $key => $tmpName) {
+                        if ($_FILES['product_images']['error'][$key] === UPLOAD_ERR_OK) {
+                            $fileType = $_FILES['product_images']['type'][$key];
+                            if (in_array($fileType, $allowedTypes)) {
+                                $ext = pathinfo($_FILES['product_images']['name'][$key], PATHINFO_EXTENSION);
+                                $newFileName = 'product-' . bin2hex(random_bytes(8)) . '.' . $ext;
+                                $targetPath = $uploadDir . $newFileName;
+
+                                if (move_uploaded_file($tmpName, $targetPath)) {
+                                    $maxOrder++;
+                                    $stmtAddImg = $conn->prepare("INSERT INTO product_images (ProductID, ImageFile, IsPrimary, SortOrder) VALUES (?, ?, 0, ?)");
+                                    $stmtAddImg->bind_param('isi', $productID, $newFileName, $maxOrder);
+                                    $stmtAddImg->execute();
+                                }
+                            }
+                        }
+                    }
+
+                    // Sắp xếp lại và đảm bảo có 1 ảnh làm IsPrimary
+                    reorderImages($conn, $productID);
+                }
+
+                header('Location: /products/');
+                exit;
+            } else {
+                $errors[] = 'Lỗi hệ thống: ' . $stmt->error;
+            }
         }
     }
 }
 
-// Xác định ID đang chọn (Ưu tiên POST khi form lỗi, nếu không dùng dữ liệu CSDL)
+// 5. Lấy danh sách ảnh hiện tại của sản phẩm
+$stmtImages = $conn->prepare("SELECT * FROM product_images WHERE ProductID = ? ORDER BY SortOrder ASC");
+$stmtImages->bind_param('i', $productID);
+$stmtImages->execute();
+$productImages = $stmtImages->get_result();
+
+// Xác định ID đang chọn
 $selectedCategoryID = $_POST['category_id'] ?? $product['CategoryID'];
 $selectedSupplierID = $_POST['supplier_id'] ?? $product['SupplierID'];
 
@@ -123,7 +263,7 @@ require_once '/var/www/src/includes/navbar.php';
         </div>
     <?php endif; ?>
 
-    <form method="POST" action="">
+    <form method="POST" action="" enctype="multipart/form-data">
 
         <div class="row">
 
@@ -228,9 +368,61 @@ require_once '/var/www/src/includes/navbar.php';
                 </div>
             </div>
 
+            <!-- QUẢN LÝ ẢNH SẢN PHẨM -->
+            <div class="col-12 mb-3">
+                <hr>
+                <h5>Quản lý hình ảnh</h5>
+
+                <!-- Upload ảnh mới -->
+                <div class="mb-3">
+                    <label class="form-label">Thêm ảnh mới (JPG, PNG, WEBP):</label>
+                    <input type="file" name="product_images[]" class="form-control" multiple accept="image/jpeg,image/png,image/webp">
+                </div>
+
+                <!-- Danh sách ảnh hiện tại -->
+                <div class="row g-3">
+                    <?php if ($productImages->num_rows > 0): ?>
+                        <?php while ($img = $productImages->fetch_assoc()): ?>
+                            <div class="col-md-3">
+                                <div class="card h-100 <?= $img['IsPrimary'] ? 'border-primary' : '' ?>">
+                                    <img src="/uploads/products/<?= htmlspecialchars($img['ImageFile']) ?>" class="card-img-top" style="height: 150px; object-fit: cover;" alt="Product Image">
+                                    <div class="card-body p-2 text-center">
+                                        <p class="card-text mb-1 small text-muted">Thứ tự: <?= $img['SortOrder'] ?></p>
+
+                                        <?php if ($img['IsPrimary']): ?>
+                                            <span class="badge bg-primary mb-2">Ảnh chính</span>
+                                        <?php else: ?>
+                                            <form method="POST" action="" class="d-inline">
+                                                <input type="hidden" name="action" value="set_primary">
+                                                <input type="hidden" name="image_id" value="<?= $img['ProductImageID'] ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-primary mb-2">Đặt làm ảnh chính</button>
+                                            </form>
+                                        <?php endif; ?>
+
+                                        <div>
+                                            <form method="POST" action="" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa ảnh này?');">
+                                                <input type="hidden" name="action" value="delete_image">
+                                                <input type="hidden" name="image_id" value="<?= $img['ProductImageID'] ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <div class="col-12">
+                            <p class="text-muted">Chưa có ảnh nào cho sản phẩm này.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
         </div>
 
-        <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+        <div class="mt-3">
+            <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+        </div>
 
     </form>
 
