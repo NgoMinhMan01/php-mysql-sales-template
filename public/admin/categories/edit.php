@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $categoryID
         );
         if ($stmt->execute()) {
-            header('Location: /categories/');
+            header('Location: /admin/categories/');
             exit;
         } else {
             $error = 'Không thể cập nhật danh mục.';
@@ -60,8 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
     }
 }
-require_once '/var/www/src/includes/header.php';
-require_once '/var/www/src/includes/navbar.php';
+require_once '/var/www/src/includes/admin/header.php';
+require_once '/var/www/src/includes/admin/navbar.php';
 ?>
 <div class="container mt-4">
     <h2 class="mb-4">Sửa danh mục</h2>
@@ -116,11 +116,11 @@ require_once '/var/www/src/includes/navbar.php';
         <button type="submit" class="btn btn-warning">
             Cập nhật
         </button>
-        <a href="/categories/" class="btn btn-secondary">
+        <a href="/admin/categories/" class="btn btn-secondary">
             Hủy
         </a>
     </form>
 </div>
 <?php
-require_once '/var/www/src/includes/footer.php';
+require_once '/var/www/src/includes/admin/footer.php';
 $conn->close();

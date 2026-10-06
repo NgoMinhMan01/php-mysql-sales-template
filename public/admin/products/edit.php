@@ -8,7 +8,7 @@ require_once '/var/www/src/config/database.php';
 $productID = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 
 if ($productID <= 0) {
-    header('Location: /products/');
+    header('Location: /admin/products/');
     exit;
 }
 
@@ -20,7 +20,7 @@ $stmtProduct->execute();
 $product = $stmtProduct->get_result()->fetch_assoc();
 
 if (!$product) {
-    header('Location: /products/');
+    header('Location: /admin/products/');
     exit;
 }
 
@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtSet->bind_param('ii', $imageId, $productID);
             $stmtSet->execute();
 
-            header("Location: /products/edit.php?id=" . $productID);
+            header("Location: /admin/products/edit.php?id=" . $productID);
             exit;
         }
     }
@@ -121,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 reorderImages($conn, $productID);
             }
 
-            header("Location: /products/edit.php?id=" . $productID);
+            header("Location: /admin/products/edit.php?id=" . $productID);
             exit;
         }
     }
@@ -222,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     reorderImages($conn, $productID);
                 }
 
-                header('Location: /products/');
+                header('Location: /admin/products/');
                 exit;
             } else {
                 $errors[] = 'Lỗi hệ thống: ' . $stmt->error;
@@ -241,8 +241,8 @@ $productImages = $stmtImages->get_result();
 $selectedCategoryID = $_POST['category_id'] ?? $product['CategoryID'];
 $selectedSupplierID = $_POST['supplier_id'] ?? $product['SupplierID'];
 
-require_once '/var/www/src/includes/header.php';
-require_once '/var/www/src/includes/navbar.php';
+require_once '/var/www/src/includes/admin/header.php';
+require_once '/var/www/src/includes/admin/navbar.php';
 
 ?>
 
@@ -250,7 +250,7 @@ require_once '/var/www/src/includes/navbar.php';
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2>Chỉnh sửa sản phẩm</h2>
-        <a href="/products/" class="btn btn-secondary">Quay lại</a>
+        <a href="/admin/products/" class="btn btn-secondary">Quay lại</a>
     </div>
 
     <?php if (!empty($errors)): ?>
@@ -430,6 +430,6 @@ require_once '/var/www/src/includes/navbar.php';
 
 <?php
 
-require_once '/var/www/src/includes/footer.php';
+require_once '/var/www/src/includes/admin/footer.php';
 
 $conn->close();
