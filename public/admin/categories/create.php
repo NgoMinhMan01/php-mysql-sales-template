@@ -5,7 +5,6 @@ require_once '/var/www/src/config/database.php';
 
 $error = '';
 
-// 6. Xử lý dữ liệu POST & 7. INSERT bằng Prepared Statement
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $categoryName = trim($_POST['category_name'] ?? '');
@@ -56,7 +55,6 @@ require_once '/var/www/src/includes/admin/navbar.php';
 
     <h2 class="mb-4">Thêm danh mục</h2>
 
-    <!-- 8.1. Hiển thị thông báo lỗi -->
     <?php if ($error !== ''): ?>
         <div class="alert alert-danger">
             <?= htmlspecialchars($error) ?>
@@ -70,7 +68,6 @@ require_once '/var/www/src/includes/admin/navbar.php';
                 Tên danh mục
             </label>
 
-            <!-- 8.2. Giữ lại tên danh mục đã nhập -->
             <input
                 type="text"
                 class="form-control"
@@ -86,7 +83,6 @@ require_once '/var/www/src/includes/admin/navbar.php';
                 Mô tả
             </label>
 
-            <!-- 8.3. Giữ lại mô tả đã nhập -->
             <textarea
                 class="form-control"
                 id="description"

@@ -8,9 +8,6 @@ $categoryID = isset($_GET['id'])
 if ($categoryID <= 0) {
     die('Mã danh mục không hợp lệ.');
 }
-/*
- * Đọc dữ liệu hiện tại của danh mục
- */
 $sql = "
     SELECT
         CategoryID,
@@ -28,9 +25,6 @@ $stmt->close();
 if (!$category) {
     die('Không tìm thấy danh mục.');
 }
-/*
- * Xử lý khi người dùng gửi form
- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $categoryName = trim($_POST['category_name'] ?? '');
     $description = trim($_POST['description'] ?? '');

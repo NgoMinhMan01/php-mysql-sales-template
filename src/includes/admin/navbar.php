@@ -15,7 +15,7 @@
             <ul class="navbar-nav me-auto">
 
                 <li class="nav-item">
-                    <a class="nav-link" href="/admin/">Trang chủ Admin</a>
+                    <a class="nav-link" href="/admin/">Trang chủ</a>
                 </li>
 
                 <li class="nav-item">
@@ -37,7 +37,6 @@
                 </li>
 
             </ul>
-            <a href="/" class="btn btn-outline-light btn-sm">Xem Trang Chủ (Frontend)</a>
         </div>
     </div>
 </nav>
