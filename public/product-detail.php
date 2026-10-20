@@ -1,10 +1,11 @@
 <?php
+require_once '/var/www/src/config/session.php';
 require_once '/var/www/src/config/database.php';
 
 // Lấy ID sản phẩm từ URL và ép kiểu số nguyên để bảo mật
 $productId = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-// Truy vấn thông tin chi tiết sản phẩm kết hợp categories và suppliers theo chuẩn PK = FK
+// Truy vấn thông tin chi tiết sản phẩm kết hợp categories và suppliers
 $sql = "
     SELECT
         p.ProductID,
@@ -13,6 +14,7 @@ $sql = "
         p.Description,
         p.Price,
         p.Unit,
+        p.StockQuantity,
         c.CategoryName,
         s.SupplierName
     FROM
@@ -40,6 +42,37 @@ if (!$result || $result->num_rows === 0) {
 $product = $result->fetch_assoc();
 $pageTitle = $product['ProductName'];
 
+// Xử lý thêm sản phẩm vào giỏ hàng (POST request)
+$cartMessage = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && isset($_POST['add_to_cart'])) {
+
+    $quantity = isset($_POST['quantity'])
+        ? (int) $_POST['quantity']
+        : 1;
+
+    if ($quantity < 1) {
+        $quantity = 1;
+    }
+
+    $stockQuantity = (int) $product['StockQuantity'];
+
+    if ($stockQuantity <= 0) {
+        $cartMessage = 'Sản phẩm hiện đã hết hàng.';
+    } else {
+        $currentQuantity = $_SESSION['cart'][$productId] ?? 0;
+        $newQuantity = $currentQuantity + $quantity;
+
+        if ($newQuantity > $stockQuantity) {
+            $newQuantity = $stockQuantity;
+        }
+
+        $_SESSION['cart'][$productId] = $newQuantity;
+        $cartMessage = 'Đã thêm sản phẩm vào giỏ hàng.';
+    }
+}
+
 // Truy vấn danh sách tất cả hình ảnh của sản phẩm này
 $sqlImages = "
     SELECT ImageFile, IsPrimary 
@@ -60,6 +93,14 @@ require_once '/var/www/src/includes/frontend/navbar.php';
             <li class="breadcrumb-item active" aria-current="page"><?= htmlspecialchars($product['ProductName']) ?></li>
         </ol>
     </nav>
+
+    <?php if (!empty($cartMessage)): ?>
+        <div class="alert alert-success alert-dismissible fade show mb-4" role="alert">
+            <?= htmlspecialchars($cartMessage) ?>
+            <a href="/cart.php" class="alert-link ms-2">Xem giỏ hàng</a>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
 
     <div class="row g-5">
         <!-- Cột hình ảnh sản phẩm (Gallery) -->
@@ -105,6 +146,7 @@ require_once '/var/www/src/includes/frontend/navbar.php';
 
             <div class="mb-4">
                 <p class="mb-1"><strong>Đơn vị tính:</strong> <?= htmlspecialchars($product['Unit']) ?></p>
+                <p class="mb-1"><strong>Tồn kho:</strong> <?= (int) $product['StockQuantity'] ?> sản phẩm</p>
             </div>
 
             <div class="mb-4">
@@ -112,14 +154,28 @@ require_once '/var/www/src/includes/frontend/navbar.php';
                 <p class="text-secondary"><?= nl2br(htmlspecialchars($product['Description'] ?? 'Không có mô tả cho sản phẩm này.')) ?></p>
             </div>
 
-            <button class="btn btn-primary btn-lg w-100" onclick="alert('Tính năng giỏ hàng đang phát triển!')">
-                Thêm vào giỏ hàng
-            </button>
+            <!-- Form Thêm vào giỏ hàng -->
+            <form action="" method="POST" class="row g-3">
+                <div class="col-auto">
+                    <label for="quantity" class="visually-hidden">Số lượng</label>
+                    <input type="number" id="quantity" name="quantity" value="1" min="1" max="<?= (int) $product['StockQuantity'] ?>" class="form-control form-control-lg text-center" style="width: 90px;">
+                </div>
+                <div class="col">
+                    <button type="submit" name="add_to_cart" class="btn btn-primary btn-lg w-100">
+                        Thêm vào giỏ hàng
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </main>
 
 <?php
-$result->free();
+if (isset($imagesResult)) {
+    $imagesResult->free();
+}
+if (isset($result)) {
+    $result->free();
+}
 require_once '/var/www/src/includes/frontend/footer.php';
 ?>

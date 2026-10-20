@@ -1,10 +1,10 @@
 ﻿<?php
 require_once '/var/www/src/config/database.php';
 
-// 1. Láº¥y danh sĂ¡ch danh má»¥c Ä‘á»ƒ Ä‘á»• vĂ o tháº» <select>
+// 1. Lấy danh sách danh mục để đổ vào thẻ <select>
 $sqlCategories = "
-    SELECT CategoryID, CategoryName
-    FROM categories
+    SELECT CategoryID, CategoryName 
+    FROM categories 
     ORDER BY CategoryName
 ";
 $categoryResult = $conn->query($sqlCategories);
@@ -14,11 +14,11 @@ while ($cat = $categoryResult->fetch_assoc()) {
 }
 $categoryResult->free();
 
-// 2. Nháº­n tham sá»‘ tĂ¬m kiáº¿m vĂ  lá»c tá»« URL (phÆ°Æ¡ng thá»©c GET)
+// 2. Nhận tham số tìm kiếm và lọc từ URL (phương thức GET)
 $keyword = trim($_GET['keyword'] ?? '');
 $categoryID = intval($_GET['category_id'] ?? 0);
 
-// 3. Cáº¥u hĂ¬nh phĂ¢n trang
+// 3. Cấu hình phân trang
 $itemsPerPage = 6;
 $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
 if ($page < 1) {
@@ -26,7 +26,7 @@ if ($page < 1) {
 }
 $searchKeyword = '%' . $keyword . '%';
 
-// 4. Äáº¿m tá»•ng sá»‘ sáº£n pháº©m phĂ¹ há»£p
+// 4. Đếm tổng số sản phẩm phù hợp
 $sqlCount = "
     SELECT COUNT(*) AS TotalProducts
     FROM products p, categories c
@@ -61,14 +61,14 @@ $totalProducts = (int) $countRow['TotalProducts'];
 $countResult->free();
 $stmtCount->close();
 
-// 5. TĂ­nh tá»•ng sá»‘ trang vĂ  offset
+// 5. Tính tổng số trang và offset
 $totalPages = (int) ceil($totalProducts / $itemsPerPage);
 if ($totalPages > 0 && $page > $totalPages) {
     $page = $totalPages;
 }
 $offset = ($page - 1) * $itemsPerPage;
 
-// 6. XĂ¢y dá»±ng cĂ¢u lá»‡nh SQL láº¥y sáº£n pháº©m vá»›i LIMIT vĂ  OFFSET
+// 6. Xây dựng câu lệnh SQL lấy sản phẩm với LIMIT và OFFSET
 $sql = "
     SELECT
         p.ProductID,
@@ -117,29 +117,29 @@ $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $result = $stmt->get_result();
 
-$pageTitle = 'Sáº£n pháº©m';
+$pageTitle = 'Sản phẩm';
 
 require_once '/var/www/src/includes/frontend/header.php';
 require_once '/var/www/src/includes/frontend/navbar.php';
 ?>
 
 <div class="container my-4">
-    <h2 class="mb-4">Danh sĂ¡ch sáº£n pháº©m</h2>
+    <h2 class="mb-4">Danh sách sản phẩm</h2>
 
-    <!-- Form TĂ¬m kiáº¿m vĂ  Lá»c danh má»¥c -->
+    <!-- Form Tìm kiếm và Lọc danh mục -->
     <form method="GET" action="products.php" class="row g-3 mb-4">
         <div class="col-md-5">
-            <input
-                type="text"
-                name="keyword"
-                class="form-control"
-                placeholder="Nháº­p tĂªn hoáº·c mĂ£ sáº£n pháº©m..."
+            <input 
+                type="text" 
+                name="keyword" 
+                class="form-control" 
+                placeholder="Nhập tên hoặc mã sản phẩm..." 
                 value="<?= htmlspecialchars($keyword) ?>"
             >
         </div>
         <div class="col-md-4">
             <select name="category_id" class="form-select">
-                <option value="0">-- Táº¥t cáº£ danh má»¥c --</option>
+                <option value="0">-- Tất cả danh mục --</option>
                 <?php foreach ($categories as $cat): ?>
                     <option value="<?= $cat['CategoryID'] ?>" <?= ($categoryID == $cat['CategoryID']) ? 'selected' : '' ?>>
                         <?= htmlspecialchars($cat['CategoryName']) ?>
@@ -148,13 +148,13 @@ require_once '/var/www/src/includes/frontend/navbar.php';
             </select>
         </div>
         <div class="col-md-3 d-flex gap-2">
-            <button type="submit" class="btn btn-primary w-50">TĂ¬m kiáº¿m</button>
-            <a href="products.php" class="btn btn-outline-secondary w-50">Äáº·t láº¡i</a>
+            <button type="submit" class="btn btn-primary w-50">Tìm kiếm</button>
+            <a href="products.php" class="btn btn-outline-secondary w-50">Đặt lại</a>
         </div>
     </form>
 
     <p class="text-muted mb-4">
-        TĂ¬m tháº¥y <strong><?= $totalProducts ?></strong> sáº£n pháº©m.
+        Tìm thấy <strong><?= $totalProducts ?></strong> sản phẩm.
     </p>
 
     <div class="row">
@@ -162,20 +162,20 @@ require_once '/var/www/src/includes/frontend/navbar.php';
             <?php while ($row = $result->fetch_assoc()): ?>
                 <div class="col-md-3 mb-4">
                     <div class="card h-100 shadow-sm">
-                        <?php
-                        $imagePath = !empty($row['ImageFile'])
-                            ? '/uploads/products/' . htmlspecialchars($row['ImageFile'])
+                        <?php 
+                        $imagePath = !empty($row['ImageFile']) 
+                            ? '/uploads/products/' . htmlspecialchars($row['ImageFile']) 
                             : 'https://via.placeholder.com/300';
                         ?>
                         <img src="<?= $imagePath ?>" class="card-img-top" alt="<?= htmlspecialchars($row['ProductName']) ?>" style="height: 200px; object-fit: cover;">
-
+                        
                         <div class="card-body d-flex flex-column">
                             <span class="badge bg-secondary mb-2 align-self-start"><?= htmlspecialchars($row['CategoryName']) ?></span>
                             <h5 class="card-title"><?= htmlspecialchars($row['ProductName']) ?></h5>
-                            <p class="card-text text-danger fw-bold mb-2"><?= number_format($row['Price'], 0, ',', '.') ?> Ä‘</p>
-
+                            <p class="card-text text-danger fw-bold mb-2"><?= number_format($row['Price'], 0, ',', '.') ?> đ</p>
+                            
                             <div class="mt-auto">
-                                <a href="/product-detail.php?id=<?= $row['ProductID'] ?>" class="btn btn-outline-primary w-100">Xem chi tiáº¿t</a>
+                                <a href="/product-detail.php?id=<?= $row['ProductID'] ?>" class="btn btn-outline-primary w-100">Xem chi tiết</a>
                             </div>
                         </div>
                     </div>
@@ -183,16 +183,16 @@ require_once '/var/www/src/includes/frontend/navbar.php';
             <?php endwhile; ?>
         <?php else: ?>
             <div class="col-12">
-                <div class="alert alert-info">KhĂ´ng tĂ¬m tháº¥y sáº£n pháº©m nĂ o phĂ¹ há»£p.</div>
+                <div class="alert alert-info">Không tìm thấy sản phẩm nào phù hợp.</div>
             </div>
         <?php endif; ?>
     </div>
 
-    <!-- Thanh phĂ¢n trang (Pagination UI) -->
+    <!-- Thanh phân trang (Pagination UI) -->
     <?php if ($totalPages > 1): ?>
-        <nav class="mt-5" aria-label="PhĂ¢n trang sáº£n pháº©m">
+        <nav class="mt-5" aria-label="Phân trang sản phẩm">
             <ul class="pagination justify-content-center flex-wrap">
-                <!-- NĂºt TrÆ°á»›c -->
+                <!-- Nút Trước -->
                 <?php
                 $previousQuery = http_build_query([
                     'keyword' => $keyword,
@@ -201,10 +201,10 @@ require_once '/var/www/src/includes/frontend/navbar.php';
                 ]);
                 ?>
                 <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                    <a class="page-link" href="products.php?<?= $previousQuery ?>">&laquo; TrÆ°á»›c</a>
+                    <a class="page-link" href="products.php?<?= $previousQuery ?>">&laquo; Trước</a>
                 </li>
 
-                <!-- CĂ¡c sá»‘ trang -->
+                <!-- Các số trang -->
                 <?php for ($pageNumber = 1; $pageNumber <= $totalPages; $pageNumber++): ?>
                     <?php
                     $query = http_build_query([
@@ -218,7 +218,7 @@ require_once '/var/www/src/includes/frontend/navbar.php';
                     </li>
                 <?php endfor; ?>
 
-                <!-- NĂºt Sau -->
+                <!-- Nút Sau -->
                 <?php
                 $nextQuery = http_build_query([
                     'keyword' => $keyword,
